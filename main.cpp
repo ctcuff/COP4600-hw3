@@ -36,17 +36,17 @@ void executeReplayCommand(std::vector<std::string>& history, const int index);
 // If the parameter background is true, this will start the specified program and return
 // execution back to this program. Otherwise, execution will halt until the given
 // program finishes executing.
-void executeStartCommand(const std::vector<std::string>& args, bool background);
+void executeStartCommand(const std::vector<std::string>& args, const bool background);
 
 // Takes a program name and (optionally) additional arguments that are passed to
 // that program
-void executeRepeatCommand(const std::vector<std::string>& args, std::vector<std::string>& history);
-void terminateProcess(const int pid);
+void executeRepeatCommand(const std::vector<std::string>& args);
+void terminateProcess(const pid_t pid);
 void terminateAllProcesses();
 
 namespace Util {
     std::vector<std::string> splitString(const std::string& string, const char delimeter) {
-        auto tokens = std::vector<std::string>{};
+        std::vector<std::string> tokens = std::vector<std::string>{};
         std::string token;
         std::stringstream ss(string);
 
@@ -66,7 +66,7 @@ namespace Util {
             std::ofstream file;
             file.open(HISTORY_FILE_PATH);
 
-            for (auto& command : history) {
+            for (std::string command : history) {
                 if (command != "byebye") {
                     file << command << std::endl;
                 }
@@ -75,7 +75,7 @@ namespace Util {
             std::cout << "mysh: History saved to " << HISTORY_FILE_PATH << std::endl;
             file.close();
         } catch (const std::exception& err) {
-            std::cout << "mysh: Error writing to history file" << err.what() << std::endl;
+            std::cout << "mysh: Error writing to history file " << err.what() << std::endl;
             return -1;
         }
 
@@ -83,7 +83,7 @@ namespace Util {
     }
 
     std::vector<std::string> loadHistory() {
-        auto history = std::vector<std::string>{};
+        std::vector<std::string> history = std::vector<std::string>{};
 
         std::ifstream file;
         std::string line;
@@ -108,7 +108,7 @@ int main() {
 
     // This history stores all commands from the history file
     // as well as commands from the current session's history
-    auto history = Util::loadHistory();
+    std::vector<std::string> history = Util::loadHistory();
 
     while (line != "byebye") {
         std::cout << "# ";
@@ -122,7 +122,7 @@ int main() {
         if (tokens.size() == 0) continue;
 
         std::string command = tokens[0];
-        auto args = std::vector<std::string>(tokens.begin() + 1, tokens.end());
+        std::vector<std::string> args = std::vector<std::string>(tokens.begin() + 1, tokens.end());
 
         parseCommand(command, args, history);
     }
@@ -158,7 +158,7 @@ void parseCommand(
     }
 
     if (command == "repeat") {
-        executeRepeatCommand(args, history);
+        executeRepeatCommand(args);
     }
 
     if (command == "replay") {
@@ -214,7 +214,7 @@ void executeHistoryCommand(std::vector<std::string>& history, const std::vector<
 }
 
 void executeReplayCommand(std::vector<std::string>& history, const int index) {
-    if (index == history.size()) {
+    if (index == (int)history.size()) {
         std::cerr << "mysh: Index out of range" << std::endl;
         return;
     }
@@ -224,8 +224,8 @@ void executeReplayCommand(std::vector<std::string>& history, const int index) {
     // at position index - 1.
     std::string command = history[history.size() - index - 2];
 
-    auto tokens = Util::splitString(command, ' ');
-    auto args = std::vector<std::string>(tokens.begin() + 1, tokens.end());
+    std::vector<std::string> tokens = Util::splitString(command, ' ');
+    std::vector<std::string> args = std::vector<std::string>(tokens.begin() + 1, tokens.end());
 
     // Don't replay a replay command since it might cause an infinite loop
     if (command.find("replay") != 0) {
@@ -246,7 +246,7 @@ void executeStartCommand(const std::vector<std::string>& args, bool background) 
     // arguments to a char** array
     const char** programArgs = new const char*[args.size() + 1];
 
-    for (int i = 0; i < args.size(); i++) {
+    for (int i = 0; i < (int)args.size(); i++) {
         programArgs[i] = args[i].c_str();
     }
 
@@ -262,8 +262,9 @@ void executeStartCommand(const std::vector<std::string>& args, bool background) 
     activePids.insert(pid);
 
     if (pid == 0) {
-        // This process is the child process
-        int statusCode = execv(programArgs[0], (char**)programArgs);
+        // This process is the child process so we need to make sure the
+        // process exits with it finishes
+        int statusCode = execv(programArgs[0], const_cast<char**>(programArgs));
 
         if (statusCode != 0) {
             std::cerr << "mysh: " << std::strerror(errno) << std::endl;
@@ -299,14 +300,14 @@ void terminateProcess(const pid_t pid) {
     std::cout << "mysh: Terminated process with pid " << pid << std::endl;
 }
 
-void executeRepeatCommand(const std::vector<std::string>& args, std::vector<std::string>& history) {
+void executeRepeatCommand(const std::vector<std::string>& args) {
     if (args.size() < 2) {
         std::cerr << "mysh: Usage: repeat [repetitions] [command]" << std::endl;
         return;
     }
 
     int repetitions;
-    auto command = std::vector<std::string>(args.begin() + 1, args.end());
+    std::vector<std::string> command = std::vector<std::string>(args.begin() + 1, args.end());
 
     try {
         repetitions = std::stoi(args[0]);
@@ -331,7 +332,7 @@ void terminateAllProcesses() {
 
     size_t numPids = activePids.size();
 
-    for (auto pid : activePids) {
+    for (pid_t pid : activePids) {
         terminateProcess(pid);
     }
 
