@@ -23,7 +23,7 @@ std::unordered_set<std::string> VALID_COMMANDS = {
 void parseCommand(
     const std::string& command,
     const std::vector<std::string>& args,
-    std::vector<std::string>& history);
+    const std::vector<std::string>& history);
 
 // If no arguments are passed, this prints all history (current application history plus the
 // history saved in mysh.history). If "-c" is passed, all history will be cleared (including
@@ -31,15 +31,15 @@ void parseCommand(
 void executeHistoryCommand(std::vector<std::string>& history, const std::vector<std::string>& args);
 
 // Re-executes the command at the given number in history.
-void executeReplayCommand(std::vector<std::string>& history, const int index);
+void executeReplayCommand(const std::vector<std::string>& history, const int index);
 
 // If the parameter background is true, this will start the specified program and return
 // execution back to this program. Otherwise, execution will halt until the given
 // program finishes executing.
 void executeStartCommand(const std::vector<std::string>& args, const bool background);
 
-// Takes a program name and (optionally) additional arguments that are passed to
-// that program
+// Takes a program name, number of repetitions, and (optionally) additional arguments
+// that are passed to that program and starts n processes of that program
 void executeRepeatCommand(const std::vector<std::string>& args);
 void terminateProcess(const pid_t pid);
 void terminateAllProcesses();
@@ -133,7 +133,7 @@ int main() {
 void parseCommand(
     const std::string& command,
     const std::vector<std::string>& args,
-    std::vector<std::string>& history) {
+    const std::vector<std::string>& history) {
 
     if (VALID_COMMANDS.find(command) == VALID_COMMANDS.end()) {
         std::cerr << "mysh: " << command << ": command not found" << std::endl;
@@ -154,7 +154,7 @@ void parseCommand(
     }
 
     if (command == "history") {
-        executeHistoryCommand(history, args);
+        executeHistoryCommand(const_cast<std::vector<std::string>&>(history), args);
     }
 
     if (command == "repeat") {
@@ -183,7 +183,7 @@ void parseCommand(
         }
 
         try {
-            terminateProcess((pid_t)std::stoi(args[0]));
+            terminateProcess(std::stoi(args[0]));
         } catch (const std::invalid_argument& err) {
             std::cerr << "mysh: Argument must be a number" << std::endl;
         } catch (const std::out_of_range& err) {
@@ -197,7 +197,7 @@ void parseCommand(
 }
 
 void executeHistoryCommand(std::vector<std::string>& history, const std::vector<std::string>& args) {
-    int historySize = history.size();
+    int historySize = static_cast<int>(history.size());
 
     if (args.size() == 0) {
         for (int i = historySize - 1; i >= 0; i--) {
@@ -213,8 +213,8 @@ void executeHistoryCommand(std::vector<std::string>& history, const std::vector<
     }
 }
 
-void executeReplayCommand(std::vector<std::string>& history, const int index) {
-    if (index == (int)history.size()) {
+void executeReplayCommand(const std::vector<std::string>& history, const int index) {
+    if (index == static_cast<int>(history.size())) {
         std::cerr << "mysh: Index out of range" << std::endl;
         return;
     }
@@ -246,7 +246,7 @@ void executeStartCommand(const std::vector<std::string>& args, bool background) 
     // arguments to a char** array
     const char** programArgs = new const char*[args.size() + 1];
 
-    for (int i = 0; i < (int)args.size(); i++) {
+    for (int i = 0; i < static_cast<int>(args.size()); i++) {
         programArgs[i] = args[i].c_str();
     }
 
