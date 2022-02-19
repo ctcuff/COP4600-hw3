@@ -1,15 +1,16 @@
 CXX = g++ -std=c++14
 
-SRC = main.cpp
+SRC = ./src/mysh.cpp
 ARGS = -Wall -Wtype-limits -Wextra
-EXE_NAME = main
+BUILD_FOLDER = ./out/
+EXE_NAME = mysh
 
 all: $(SRC)
-	@ $(CXX) $(SRC) -o $(EXE_NAME) $(ARGS)
+	@ mkdir -p $(BUILD_FOLDER)
+	@ $(CXX) $(SRC) -o $(BUILD_FOLDER)$(EXE_NAME) $(ARGS)
 
 run:
-	@ make all
-	@ ./$(EXE_NAME)
+	@ make all && cd $(BUILD_FOLDER) && ./$(EXE_NAME)
 
 clean:
-	@ rm $(EXE_NAME)
+	@ rm -rf $(BUILD_FOLDER)

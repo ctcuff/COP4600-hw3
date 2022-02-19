@@ -1,10 +1,9 @@
-#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <fstream>
 #include <functional>
 #include <iostream>
-#include <signal.h>
+#include <csignal>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -18,12 +17,14 @@
 std::unordered_set<pid_t> activePids{};
 std::unordered_set<std::string> VALID_COMMANDS = {
     "background", "byebye", "history", "repeat",
-    "replay", "start", "terminate", "terminateall"};
+    "replay", "start", "terminate", "terminateall"
+};
 
 void parseCommand(
     const std::string& command,
     const std::vector<std::string>& args,
-    const std::vector<std::string>& history);
+    const std::vector<std::string>& history
+);
 
 // If no arguments are passed, this prints all history (current application history plus the
 // history saved in mysh.history). If "-c" is passed, all history will be cleared (including
@@ -31,26 +32,28 @@ void parseCommand(
 void executeHistoryCommand(std::vector<std::string>& history, const std::vector<std::string>& args);
 
 // Re-executes the command at the given number in history.
-void executeReplayCommand(const std::vector<std::string>& history, const int index);
+void executeReplayCommand(const std::vector<std::string>& history, int index);
 
 // If the parameter background is true, this will start the specified program and return
 // execution back to this program. Otherwise, execution will halt until the given
 // program finishes executing.
-void executeStartCommand(const std::vector<std::string>& args, const bool background);
+void executeStartCommand(const std::vector<std::string>& args, bool background);
 
 // Takes a program name, number of repetitions, and (optionally) additional arguments
 // that are passed to that program and starts n processes of that program
 void executeRepeatCommand(const std::vector<std::string>& args);
-void terminateProcess(const pid_t pid);
+
+void terminateProcess(pid_t pid);
+
 void terminateAllProcesses();
 
 namespace Util {
-    std::vector<std::string> splitString(const std::string& string, const char delimeter) {
+    std::vector<std::string> splitString(const std::string& string, const char delimiter) {
         std::vector<std::string> tokens = std::vector<std::string>{};
         std::string token;
         std::stringstream ss(string);
 
-        while (std::getline(ss, token, delimeter)) {
+        while (std::getline(ss, token, delimiter)) {
             tokens.push_back(token);
         }
 
@@ -66,7 +69,7 @@ namespace Util {
             std::ofstream file;
             file.open(HISTORY_FILE_PATH);
 
-            for (std::string command : history) {
+            for (const std::string& command : history) {
                 if (command != "byebye") {
                     file << command << std::endl;
                 }
@@ -119,7 +122,7 @@ int main() {
 
         std::vector<std::string> tokens = Util::splitString(line, ' ');
 
-        if (tokens.size() == 0) continue;
+        if (tokens.empty()) continue;
 
         std::string command = tokens[0];
         std::vector<std::string> args = std::vector<std::string>(tokens.begin() + 1, tokens.end());
@@ -133,7 +136,8 @@ int main() {
 void parseCommand(
     const std::string& command,
     const std::vector<std::string>& args,
-    const std::vector<std::string>& history) {
+    const std::vector<std::string>& history
+) {
 
     if (VALID_COMMANDS.find(command) == VALID_COMMANDS.end()) {
         std::cerr << "mysh: " << command << ": command not found" << std::endl;
@@ -141,7 +145,7 @@ void parseCommand(
     }
 
     if (command == "background" || command == "start") {
-        if (args.size() < 1) {
+        if (args.empty()) {
             std::cerr << "mysh: Missing argument [program]" << std::endl;
             return;
         }
@@ -162,7 +166,7 @@ void parseCommand(
     }
 
     if (command == "replay") {
-        if (args.size() < 1) {
+        if (args.empty()) {
             std::cerr << "mysh: Missing argument [index]" << std::endl;
             return;
         }
@@ -177,7 +181,7 @@ void parseCommand(
     }
 
     if (command == "terminate") {
-        if (args.size() < 1) {
+        if (args.empty()) {
             std::cerr << "mysh: Missing argument [pid]" << std::endl;
             return;
         }
@@ -199,7 +203,7 @@ void parseCommand(
 void executeHistoryCommand(std::vector<std::string>& history, const std::vector<std::string>& args) {
     int historySize = static_cast<int>(history.size());
 
-    if (args.size() == 0) {
+    if (args.empty()) {
         for (int i = historySize - 1; i >= 0; i--) {
             int index = historySize - (i + 1);
             std::cout << index << ": " << history[i] << std::endl;
@@ -244,13 +248,13 @@ void executeStartCommand(const std::vector<std::string>& args, bool background) 
 
     // execv ony takes a char** array so we need to convert the string vector
     // arguments to a char** array
-    const char** programArgs = new const char*[args.size() + 1];
+    const char** programArgs = new const char* [args.size() + 1];
 
     for (int i = 0; i < static_cast<int>(args.size()); i++) {
         programArgs[i] = args[i].c_str();
     }
 
-    programArgs[args.size()] = NULL;
+    programArgs[args.size()] = nullptr;
 
     pid_t pid = fork();
 
@@ -297,6 +301,8 @@ void terminateProcess(const pid_t pid) {
         return;
     }
 
+    activePids.erase(pid);
+
     std::cout << "mysh: Terminated process with pid " << pid << std::endl;
 }
 
@@ -325,7 +331,7 @@ void executeRepeatCommand(const std::vector<std::string>& args) {
 }
 
 void terminateAllProcesses() {
-    if (activePids.size() == 0) {
+    if (activePids.empty()) {
         std::cout << "mysh: No precesses to terminate" << std::endl;
         return;
     }
