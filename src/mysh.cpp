@@ -69,10 +69,8 @@ namespace Util {
             std::ofstream file;
             file.open(HISTORY_FILE_PATH);
 
-            for (const std::string& command : history) {
-                if (command != "byebye") {
-                    file << command << std::endl;
-                }
+            for (const std::string& command: history) {
+                file << command << std::endl;
             }
 
             std::cout << "mysh: History saved to " << HISTORY_FILE_PATH << std::endl;
@@ -224,7 +222,7 @@ void executeReplayCommand(const std::vector<std::string>& history, const int ind
     }
 
     // Need to subtract 2 here because "replay" will be added to the history
-    // before the command is run and we need to get the command that was executed
+    // before the command is run, and we need to get the command that was executed
     // at position index - 1.
     std::string command = history[history.size() - index - 2];
 
@@ -240,13 +238,13 @@ void executeReplayCommand(const std::vector<std::string>& history, const int ind
 }
 
 void executeStartCommand(const std::vector<std::string>& args, bool background) {
-    // Check if the file exists before running so we don't unnecessarily fork
+    // Check if the file exists before running, so we don't unnecessarily fork
     if (!Util::doesFileExist(args[0])) {
         std::cerr << "mysh: " << args[0] << ": No such file or directory" << std::endl;
         return;
     }
 
-    // execv ony takes a char** array so we need to convert the string vector
+    // execv ony takes a char** array, so we need to convert the string vector
     // arguments to a char** array
     const char** programArgs = new const char* [args.size() + 1];
 
@@ -266,7 +264,7 @@ void executeStartCommand(const std::vector<std::string>& args, bool background) 
     activePids.insert(pid);
 
     if (pid == 0) {
-        // This process is the child process so we need to make sure the
+        // This process is the child process, so we need to make sure the
         // process exits with it finishes
         int statusCode = execv(programArgs[0], const_cast<char**>(programArgs));
 
@@ -338,7 +336,7 @@ void terminateAllProcesses() {
 
     size_t numPids = activePids.size();
 
-    for (pid_t pid : activePids) {
+    for (pid_t pid: activePids) {
         terminateProcess(pid);
     }
 
