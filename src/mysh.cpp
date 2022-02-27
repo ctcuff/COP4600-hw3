@@ -1,7 +1,6 @@
 #include <cerrno>
 #include <cstring>
 #include <fstream>
-#include <functional>
 #include <iostream>
 #include <csignal>
 #include <sstream>
@@ -9,16 +8,13 @@
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <unordered_set>
+#include <set>
 #include <vector>
 
 #define HISTORY_FILE_PATH "./mysh.history"
 
-std::unordered_set<pid_t> activePids{};
-std::unordered_set<std::string> VALID_COMMANDS = {
-    "background", "byebye", "history", "repeat",
-    "replay", "start", "terminate", "terminateall"
-};
+std::set<pid_t> activePids;
+std::set<std::string> VALID_COMMANDS;
 
 void parseCommand(
     const std::string& command,
@@ -43,18 +39,34 @@ void executeStartCommand(const std::vector<std::string>& args, bool background);
 // that are passed to that program and starts n processes of that program
 void executeRepeatCommand(const std::vector<std::string>& args);
 
-void terminateProcess(pid_t pid);
+// Returns true if the process was terminated successfully
+bool terminateProcess(pid_t pid);
 
 void terminateAllProcesses();
 
 namespace Util {
+    bool isStringEmpty(std::string string) {
+        if (string.empty()) {
+            return true;
+        }
+
+        for (int i = 0; i < static_cast<int>(string.size()); i++) {
+            if (string[i] != ' ') {
+                return false;
+            }
+        }
+        return true;
+    }
+
     std::vector<std::string> splitString(const std::string& string, const char delimiter) {
-        std::vector<std::string> tokens = std::vector<std::string>{};
+        std::vector<std::string> tokens = std::vector<std::string>();
         std::string token;
         std::stringstream ss(string);
 
         while (std::getline(ss, token, delimiter)) {
-            tokens.push_back(token);
+            if (!Util::isStringEmpty(token)) {
+                tokens.push_back(token);
+            }
         }
 
         return tokens;
@@ -69,8 +81,10 @@ namespace Util {
             std::ofstream file;
             file.open(HISTORY_FILE_PATH);
 
-            for (const std::string& command: history) {
-                file << command << std::endl;
+            for (int i = 0; i < static_cast<int>(history.size()); i++) {
+                if (history[i] != "byebye") {
+                    file << history[i] << std::endl;
+                }
             }
 
             std::cout << "mysh: History saved to " << HISTORY_FILE_PATH << std::endl;
@@ -84,7 +98,7 @@ namespace Util {
     }
 
     std::vector<std::string> loadHistory() {
-        std::vector<std::string> history = std::vector<std::string>{};
+        std::vector<std::string> history = std::vector<std::string>();
 
         std::ifstream file;
         std::string line;
@@ -105,6 +119,15 @@ namespace Util {
 }
 
 int main() {
+    VALID_COMMANDS.insert("background");
+    VALID_COMMANDS.insert("byebye");
+    VALID_COMMANDS.insert("history");
+    VALID_COMMANDS.insert("repeat");
+    VALID_COMMANDS.insert("replay");
+    VALID_COMMANDS.insert("start");
+    VALID_COMMANDS.insert("terminate");
+    VALID_COMMANDS.insert("terminateall");
+
     std::string line;
 
     // This history stores all commands from the history file
@@ -115,12 +138,13 @@ int main() {
         std::cout << "# ";
         // Need to use std::getline instead of std::cin because cin skips spaces
         std::getline(std::cin, line, '\n');
-
-        history.push_back(line);
-
         std::vector<std::string> tokens = Util::splitString(line, ' ');
 
-        if (tokens.empty()) continue;
+        if (tokens.empty() || Util::isStringEmpty(line)) {
+            continue;
+        }
+
+        history.push_back(line);
 
         std::string command = tokens[0];
         std::vector<std::string> args = std::vector<std::string>(tokens.begin() + 1, tokens.end());
@@ -185,7 +209,11 @@ void parseCommand(
         }
 
         try {
-            terminateProcess(std::stoi(args[0]));
+            pid_t pid = std::stoi(args[0]);
+
+            if (terminateProcess(pid)) {
+                activePids.erase(pid);
+            }
         } catch (const std::invalid_argument& err) {
             std::cerr << "mysh: Argument must be a number" << std::endl;
         } catch (const std::out_of_range& err) {
@@ -225,7 +253,6 @@ void executeReplayCommand(const std::vector<std::string>& history, const int ind
     // before the command is run, and we need to get the command that was executed
     // at position index - 1.
     std::string command = history[history.size() - index - 2];
-
     std::vector<std::string> tokens = Util::splitString(command, ' ');
     std::vector<std::string> args = std::vector<std::string>(tokens.begin() + 1, tokens.end());
 
@@ -286,22 +313,22 @@ void executeStartCommand(const std::vector<std::string>& args, bool background) 
     }
 }
 
-void terminateProcess(const pid_t pid) {
+bool terminateProcess(const pid_t pid) {
     if (pid < 0) {
         std::cerr << "mysh: Argument [pid] must be >= 0" << std::endl;
-        return;
+        return false;
     }
 
     int statusCode = kill(pid, SIGTERM);
 
     if (statusCode != 0) {
         std::cerr << "mysh: " << std::strerror(errno) << std::endl;
-        return;
+        return false;
     }
 
-    activePids.erase(pid);
-
     std::cout << "mysh: Terminated process with pid " << pid << std::endl;
+
+    return true;
 }
 
 void executeRepeatCommand(const std::vector<std::string>& args) {
@@ -330,14 +357,14 @@ void executeRepeatCommand(const std::vector<std::string>& args) {
 
 void terminateAllProcesses() {
     if (activePids.empty()) {
-        std::cout << "mysh: No precesses to terminate" << std::endl;
+        std::cout << "mysh: No processes to terminate" << std::endl;
         return;
     }
 
     size_t numPids = activePids.size();
 
-    for (pid_t pid: activePids) {
-        terminateProcess(pid);
+    for (std::set<pid_t>::iterator it = activePids.begin(); it != activePids.end(); ++it) {
+        terminateProcess(*it);
     }
 
     activePids.clear();
